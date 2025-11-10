@@ -1,0 +1,3 @@
+services:
+  dian:
+    path: lambdas/dian
