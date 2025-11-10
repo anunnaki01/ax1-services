@@ -3,3 +3,9 @@ dist/
 .serverless/
 *.log
 .env
+
+# Output de pruebas locales
+output/
+*.png
+certificado*.p12
+certificado-base64.txt

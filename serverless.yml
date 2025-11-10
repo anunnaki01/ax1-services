@@ -1,0 +1,31 @@
+service: ax1-services
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  environment: ${file(./env.${self:provider.stage}.yml)}
+  memorySize: 1024
+  timeout: 900
+  ephemeralStorageSize: 2048
+
+plugins:
+  - serverless-plugin-typescript
+
+package:
+  individually: false
+  patterns:
+    - '!node_modules/@types/**'
+    - '!node_modules/typescript/**'
+    - '!node_modules/serverless/**'
+    - 'node_modules/**'
+  followSymlinks: true
+
+functions:
+  dian-auth:
+    name: ${self:service}-dian-auth-${self:provider.stage}
+    handler: lambdas/get-dian-cookie-by-certificate.handler
+
