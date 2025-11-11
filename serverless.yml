@@ -30,6 +30,10 @@ functions:
     name: ${self:service}-dian-auth-${self:provider.stage}
     handler: lambdas/get-dian-cookie-by-certificate.handler
 
+  generate-dian-token-email:
+    name: ${self:service}-generate-dian-token-email-${self:provider.stage}
+    handler: lambdas/generate-dian-token-email.handler
+
   rues-query:
     name: ${self:service}-rues-query-${self:provider.stage}
     handler: lambdas/get-rues-data.handler
