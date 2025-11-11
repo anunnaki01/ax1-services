@@ -1,5 +1,8 @@
 # Changelog
 
+Release[1.1.0]
+- Lambda para generar el correo del token de la DIAN.
+
 Hotfix[1.0.1]
 - Baja memorySize 1024 la lambda.
 
