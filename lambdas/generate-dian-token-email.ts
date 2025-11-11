@@ -6,9 +6,9 @@ export const handler = async (event: any) => {
         console.log('Event:', JSON.stringify(event, null, 2));
 
         const payload: DianTokenEmailPayload = {
-            identificationType: String(event.identificationType ?? event.CompanyIdentificationType ?? ''),
-            userCode: String(event.userCode ?? event.UserCode ?? ''),
-            companyCode: String(event.companyCode ?? event.CompanyCode ?? ''),
+            identificationType: String(event.identificationType ?? ''),
+            userCode: String(event.userCode ?? ''),
+            companyCode: String(event.companyCode ?? ''),
             origin: event.origin ? String(event.origin) : undefined,
             headless: normalizeBoolean(event.headless, true)
         };
