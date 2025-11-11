@@ -86,6 +86,58 @@ Obtiene cookies de sesión autenticándose en el portal DIAN usando certificado 
 }
 ```
 
+### `generate-dian-token-email` - Solicitud de token DIAN por correo
+
+Inicia sesión como representante legal en el catálogo DIAN y dispara el envío del correo que contiene el token de acceso.
+
+#### Parámetros de entrada
+
+```json
+{
+  "identificationType": "10910094",   // Tipo de identificación de la empresa
+  "userCode": "1010168874",           // Documento del representante legal
+  "companyCode": "901827899",         // NIT de la empresa
+  "origin": "test",                   // Opcional: etiqueta para trazabilidad
+  "headless": true                    // Opcional: por defecto true en Lambda
+}
+```
+
+#### Respuesta exitosa (statusCode: 200)
+
+```json
+{
+  "success": true,
+  "message": "Se ha enviado el código de acceso al correo registrado.",
+  "origin": "test"
+}
+```
+
+#### Respuesta de error (statusCode: 400 o 500)
+
+```json
+{
+  "success": false,
+  "error": "Verifique las credenciales de inicio de sesión.",
+  "origin": "test",
+  "screenshot": "<base64 opcional para diagnóstico>"
+}
+```
+
+#### Notas operativas
+
+- Usa `playwright-core` con la layer de Chromium (`@sparticuz/chromium`) en AWS Lambda.
+- Reutiliza `resolveCaptcha` (`src/infrastructure/utils/captcha.ts`) para resolver Turnstile vía AntiCaptcha/2Captcha.
+- Captura screenshot en base64 cuando ocurre un error, útil para depuración local.
+
+#### Pruebas locales
+
+```bash
+npm run build
+node scripts/test-generate-dian-token-email-local.js
+```
+
+El script carga el payload desde `events/dian-token.json` y ejecuta el handler compilado en `dist/lambdas/generate-dian.token-email`.
+
 ### `rues-query` - Consulta RUES con Playwright
 
 Realiza scraping controlado sobre https://www.rues.org.co para obtener información mercantil (RM, ESAL, ESOL). Usa `playwright-core` con la layer `chrome-aws-lambda`, rota proxies Webshare y cierra explícitamente `browser`, `context` y `page` para evitar fugas.
@@ -155,11 +207,13 @@ El script usa el handler compilado en `dist/lambdas/get-rues-data` y permite obs
 ### Invocar lambdas desplegadas
 ```bash
 npx serverless invoke -f dian-auth -p events/dian-auth.json --log
+npx serverless invoke -f generate-dian-token-email -p events/dian-token.json --log
 npx serverless invoke -f rues-query -p events/rues-query.json --log
 ```
 
 ### Archivos de ejemplo
 - `events/dian-auth.json`
+- `events/dian-token.json`
 - `events/rues-query.json`
 
 ## 📁 Estructura del Proyecto
