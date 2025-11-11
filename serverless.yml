@@ -1,0 +1,40 @@
+service: ax1-services
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-2'}
+  environment: ${file(./env.${self:provider.stage}.yml)}
+  memorySize: 1024
+  timeout: 900
+  ephemeralStorageSize: 2048
+
+plugins:
+  - serverless-plugin-typescript
+
+package:
+  individually: false
+  patterns:
+    - '!node_modules/@types/**'
+    - '!node_modules/typescript/**'
+    - '!node_modules/serverless/**'
+    - 'node_modules/**'
+  followSymlinks: true
+
+functions:
+  dian-auth:
+    name: ${self:service}-dian-auth-${self:provider.stage}
+    handler: lambdas/get-dian-cookie-by-certificate.handler
+
+  rues-query:
+    name: ${self:service}-rues-query-${self:provider.stage}
+    handler: lambdas/get-rues-data.handler
+    timeout: 180
+    memorySize: 2048
+    reservedConcurrency: 5
+    layers:
+      - arn:aws:lambda:us-east-2:764866452798:layer:chrome-aws-lambda:45
+
