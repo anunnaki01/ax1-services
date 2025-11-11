@@ -33,7 +33,7 @@ functions:
     name: ${self:service}-rues-query-${self:provider.stage}
     handler: lambdas/get-rues-data.handler
     timeout: 180
-    memorySize: 2048
+    memorySize: 1024
     reservedConcurrency: 5
     layers:
       - arn:aws:lambda:us-east-2:764866452798:layer:chrome-aws-lambda:45
