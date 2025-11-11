@@ -11,6 +11,7 @@ provider:
   memorySize: 1024
   timeout: 900
   ephemeralStorageSize: 2048
+  logRetentionInDays: 14 #retencion de logs 2 semanas
 
 plugins:
   - serverless-plugin-typescript
