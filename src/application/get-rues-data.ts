@@ -5,7 +5,7 @@
 
 import { chromium, Browser, BrowserContext, Page } from 'playwright-core';
 import { RuesPayload, RuesResult, RuesData } from '../domain/rues/interfaces';
-import { getNextProxy } from '../config/proxies';
+import { getNextProxy } from '../infrastructure/config/proxies';
 
 // Detectar si estamos en Lambda
 const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;

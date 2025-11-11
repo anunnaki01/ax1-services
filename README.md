@@ -135,7 +135,7 @@ Realiza scraping controlado sobre https://www.rues.org.co para obtener informaci
 
 #### Notas operativas
 
-- Rotación de IP: usa `getNextProxy()` (`src/config/proxies.ts`) con proxies Webshare en modo round-robin.
+- Rotación de IP: usa `getNextProxy()` (`src/infrastructure/config/proxies.ts`) con proxies Webshare en modo round-robin.
 - Sincronización con UI: espera al spinner del botón “Buscar” antes de leer resultados para evitar respuestas inconsistentes.
 - Recursos de navegador: cierra `page`, `context` y `browser` en el bloque `finally`.
 - Timeouts configurados a 120 s por acción y reintentos en pestañas de detalle para mitigar lentitud del sitio.
@@ -169,7 +169,9 @@ ax1-services/
 ├── src/
 │   ├── application/          # Lógica de negocio
 │   ├── domain/              # Interfaces y tipos
-│   └── utils/               # Utilidades compartidas
+│   └── infrastructure/
+│       ├── config/          # Configuraciones (proxies, etc.)
+│       └── utils/           # Utilidades compartidas
 ├── lambdas/                 # Handlers de lambdas
 ├── events/                  # Payloads de ejemplo
 └── serverless.yml           # Configuración Serverless
