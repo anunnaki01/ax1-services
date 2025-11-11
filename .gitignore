@@ -9,3 +9,4 @@ output/
 *.png
 certificado*.p12
 certificado-base64.txt
+.idea

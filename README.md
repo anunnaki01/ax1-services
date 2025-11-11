@@ -86,15 +86,81 @@ Obtiene cookies de sesión autenticándose en el portal DIAN usando certificado 
 }
 ```
 
-## 🧪 Pruebas Locales
+### `rues-query` - Consulta RUES con Playwright
 
-### Invocar lambda desplegada
-```bash
-npx serverless invoke -f dian-auth -p events/dian-auth.json --log
+Realiza scraping controlado sobre https://www.rues.org.co para obtener información mercantil (RM, ESAL, ESOL). Usa `playwright-core` con la layer `chrome-aws-lambda`, rota proxies Webshare y cierra explícitamente `browser`, `context` y `page` para evitar fugas.
+
+#### Parámetros de entrada
+
+```json
+{
+  "identificationNumber": "string",   // NIT o identificación a consultar
+  "headless": true                    // Opcional; Lambda siempre usa headless=true
+}
 ```
 
-### Archivo de ejemplo
-Ver `events/dian-auth-example.json` para la estructura del payload.
+#### Respuesta exitosa (statusCode: 200)
+
+```json
+{
+  "success": true,
+  "data": {
+    "nombre": "EMPRESA DEMO S.A.S",
+    "tipo_empresa": "Registro Mercantil",
+    "identificacion": "901234567",
+    "numero_de_inscripcion": "45123",
+    "categoria": "SOCIEDAD",
+    "camara_de_comercio": "CÁMARA DE COMERCIO DEMO",
+    "numero_de_matricula": "12345",
+    "estado": "Activa",
+    "informacion_general": {
+      "municipio": "BOGOTÁ, D.C.",
+      "direccion": "CALLE 123 #45-67"
+    },
+    "actividad_economica": [
+      { "ciiu": "6201", "description": "Desarrollo de software" }
+    ],
+    "representante_legal": "JUAN PÉREZ"
+  }
+}
+```
+
+> Las propiedades pueden variar según la información disponible; la interfaz completa está en `src/domain/rues/interfaces.ts`.
+
+#### Respuestas de error
+
+- **404** (`NOT_FOUND`): `"Documento <id> no encontrado en ningún tipo de registro (RM, ESAL, ESOL)."`
+- **503** (`API_ERROR`): La API de RUES no respondió después de varios intentos.
+- **500**: Errores inesperados (fallas del sitio, timeouts, etc.).
+
+#### Notas operativas
+
+- Rotación de IP: usa `getNextProxy()` (`src/infrastructure/config/proxies.ts`) con proxies Webshare en modo round-robin.
+- Sincronización con UI: espera al spinner del botón “Buscar” antes de leer resultados para evitar respuestas inconsistentes.
+- Recursos de navegador: cierra `page`, `context` y `browser` en el bloque `finally`.
+- Timeouts configurados a 120 s por acción y reintentos en pestañas de detalle para mitigar lentitud del sitio.
+- Variables dependientes del entorno (credenciales, API keys) provienen del archivo `env.<stage>.yml` cargado por Serverless.
+
+#### Pruebas locales
+
+```bash
+npm run build
+node scripts/test-get-rues-data-local.js <IDENTIFICACION>
+```
+
+El script usa el handler compilado en `dist/lambdas/get-rues-data` y permite observar la respuesta completa de la lambda.
+
+## 🧪 Pruebas Locales
+
+### Invocar lambdas desplegadas
+```bash
+npx serverless invoke -f dian-auth -p events/dian-auth.json --log
+npx serverless invoke -f rues-query -p events/rues-query.json --log
+```
+
+### Archivos de ejemplo
+- `events/dian-auth.json`
+- `events/rues-query.json`
 
 ## 📁 Estructura del Proyecto
 
@@ -103,7 +169,9 @@ ax1-services/
 ├── src/
 │   ├── application/          # Lógica de negocio
 │   ├── domain/              # Interfaces y tipos
-│   └── utils/               # Utilidades compartidas
+│   └── infrastructure/
+│       ├── config/          # Configuraciones (proxies, etc.)
+│       └── utils/           # Utilidades compartidas
 ├── lambdas/                 # Handlers de lambdas
 ├── events/                  # Payloads de ejemplo
 └── serverless.yml           # Configuración Serverless

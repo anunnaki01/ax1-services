@@ -2,7 +2,7 @@ import { chromium, Browser, BrowserContext, Page } from 'playwright-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as forge from 'node-forge';
-import { resolveCaptcha } from '../utils/captcha';
+import { resolveCaptcha } from '../infrastructure/utils/captcha';
 import { Payload } from '../domain/dian/interfaces';
 
 // Detectar si estamos en Lambda
