@@ -1,5 +1,8 @@
 # Changelog
 
+Hotfix[1.1.1]
+- Cambia runtime a nodejs22.x.
+
 Release[1.1.0]
 - Lambda para generar el correo del token de la DIAN.
 
