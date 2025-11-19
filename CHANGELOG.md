@@ -1,5 +1,8 @@
 # Changelog
 
+Hotfix[1.1.2]
+- Soporta persona natural para generar el EMAIL del token de la DIAN.
+
 Hotfix[1.1.1]
 - Cambia runtime a nodejs22.x.
 
