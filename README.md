@@ -4,7 +4,7 @@ Servicios Lambda para automatización de procesos DIAN.
 
 ## 📋 Requisitos
 
-- Node.js 20.x
+- Node.js 22.x
 - AWS CLI configurado
 - Credenciales AWS con permisos de Lambda
 
