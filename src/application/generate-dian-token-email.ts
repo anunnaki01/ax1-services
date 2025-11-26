@@ -18,22 +18,36 @@ declare global {
 }
 
 const CONFIG = {
-    url: 'https://catalogo-vpfe.dian.gov.co/User/CompanyLogin',
+    urls: {
+        company: 'https://catalogo-vpfe.dian.gov.co/User/CompanyLogin',
+        person: 'https://catalogo-vpfe.dian.gov.co/User/PersonLogin'
+    },
     selectors: {
-        legalRepresentativeButton: '#legalRepresentative',
-        form: '#form0',
-        identificationType: '#CompanyIdentificationType',
-        userCode: '#UserCode',
-        companyCode: '#CompanyCode',
-        captchaContainer: '.cf-turnstile',
-        captchaResponseInput: 'input[name="cf-turnstile-response"]',
-        submitButton: '#form0 button.btn.btn-primary',
-        errorModal: '#errorModal',
-        errorModalTitle: '#errorModal-title',
-        errorModalMessage: '#errorModal-message',
-        successAlert: '.dian-alert-info p',
-        errorAlert: '.dian-alert-danger p',
-        toastMessage: '.toast-message'
+        company: {
+            legalRepresentativeButton: '#legalRepresentative',
+            form: '#form0',
+            identificationType: '#CompanyIdentificationType',
+            userCode: '#UserCode',
+            companyCode: '#CompanyCode',
+            submitButton: '#form0 button.btn.btn-primary',
+        },
+        person: {
+            form: 'form[action="/User/PersonAuthentication"]',
+            identificationType: '#PersonIdentificationType',
+            personCode: '#PersonCode',
+            submitButton: 'form[action="/User/PersonAuthentication"] button.btn.btn-primary',
+        },
+        common: {
+            captchaContainer: '.cf-turnstile',
+            captchaResponseInput: 'input[name="cf-turnstile-response"]',
+            errorModal: '#errorModal',
+            errorModalTitle: '#errorModal-title',
+            errorModalMessage: '#errorModal-message',
+            successAlert: '.dian-alert-info p',
+            errorAlert: '.dian-alert-danger p',
+            toastMessage: '.toast-message',
+            fieldValidationError: '.field-validation-error'
+        }
     },
     timeouts: {
         default: 60000,
@@ -56,22 +70,28 @@ export async function handle(payload: DianTokenEmailPayload): Promise<DianTokenE
         console.log('=== Generar token DIAN por correo (Playwright) ===');
         console.log('Origen:', payload.origin ?? 'no especificado');
 
-        const headless = payload.headless ?? (isLambda ? true : false);
+        const isPersonLogin = String(payload.userCode) === String(payload.companyCode);
+        const targetUrl = isPersonLogin ? CONFIG.urls.person : CONFIG.urls.company;
+        
+        console.log('Tipo de login:', isPersonLogin ? 'Persona' : 'Empresa');
+        console.log('URL:', targetUrl);
+
+        const headless = payload.headless ?? isLambda;
 
         browser = await initializeBrowser(headless);
         context = await browser.newContext();
         page = await context.newPage();
         await setupModalGuards(page);
 
-        await page.goto(CONFIG.url, {
+        await page.goto(targetUrl, {
             waitUntil: 'domcontentloaded',
             timeout: 60000
         });
         await waitForModalGuardReady(page);
 
-        await interactWithLoginForm(page, payload);
+        await interactWithLoginForm(page, payload, isPersonLogin);
 
-        const message = await waitForResultMessage(page);
+        const message = await waitForResultMessage(page, isPersonLogin);
 
         console.log('Resultado exitoso:', message);
 
@@ -268,7 +288,7 @@ async function setupModalGuards(page: Page): Promise<void> {
         } else {
             setup();
         }
-    }, { selectors: CONFIG.selectors });
+    }, { selectors: CONFIG.selectors.common });
 }
 
 async function getModalState(page: Page): Promise<ModalGuardState | null> {
@@ -306,9 +326,43 @@ async function waitForModalGuardReady(page: Page): Promise<void> {
     }
 }
 
-async function interactWithLoginForm(page: Page, payload: DianTokenEmailPayload): Promise<void> {
+async function interactWithLoginForm(page: Page, payload: DianTokenEmailPayload, isPersonLogin: boolean): Promise<void> {
+    if (isPersonLogin) {
+        await interactWithPersonForm(page, payload);
+    } else {
+        await interactWithCompanyForm(page, payload);
+    }
+}
 
-    const legalRepresentativeButton = page.locator(CONFIG.selectors.legalRepresentativeButton);
+async function interactWithPersonForm(page: Page, payload: DianTokenEmailPayload): Promise<void> {
+    console.log('Esperando formulario de persona...');
+    await page.waitForSelector(CONFIG.selectors.person.form, { state: 'visible' });
+
+    console.log('Llenando campos del formulario de persona...');
+    await page.selectOption(CONFIG.selectors.person.identificationType, String(payload.identificationType));
+    await page.fill(CONFIG.selectors.person.personCode, String(payload.userCode));
+
+    console.log('Resolviendo captcha Turnstile...');
+    const captchaSolution = await solveTurnstileCaptcha(page);
+
+    if (!captchaSolution) {
+        throw new Error('No se pudo resolver el captcha Turnstile');
+    }
+
+    console.log('Captcha resuelto. Enviando formulario...');
+    await page.waitForTimeout(CONFIG.waitTimes.afterCaptcha);
+    const submitButton = page.locator(CONFIG.selectors.person.submitButton);
+
+    try {
+        await submitButton.click({ timeout: 5000 });
+    } catch (error) {
+        console.warn('⚠️  Falló el click en submit del formulario de persona, reintentando con force...');
+        await submitButton.click({ force: true });
+    }
+}
+
+async function interactWithCompanyForm(page: Page, payload: DianTokenEmailPayload): Promise<void> {
+    const legalRepresentativeButton = page.locator(CONFIG.selectors.company.legalRepresentativeButton);
     await legalRepresentativeButton.waitFor({ state: 'visible' });
     await page.waitForTimeout(5000);
     
@@ -321,13 +375,13 @@ async function interactWithLoginForm(page: Page, payload: DianTokenEmailPayload)
 
     await page.waitForTimeout(2000);
 
-    console.log('Esperando formulario...');
-    await page.waitForSelector(CONFIG.selectors.form, { state: 'visible' });
+    console.log('Esperando formulario de empresa...');
+    await page.waitForSelector(CONFIG.selectors.company.form, { state: 'visible' });
 
-    console.log('Llenando campos del formulario...');
-    await page.selectOption(CONFIG.selectors.identificationType, String(payload.identificationType));
-    await page.fill(CONFIG.selectors.userCode, String(payload.userCode));
-    await page.fill(CONFIG.selectors.companyCode, String(payload.companyCode));
+    console.log('Llenando campos del formulario de empresa...');
+    await page.selectOption(CONFIG.selectors.company.identificationType, String(payload.identificationType));
+    await page.fill(CONFIG.selectors.company.userCode, String(payload.userCode));
+    await page.fill(CONFIG.selectors.company.companyCode, String(payload.companyCode));
 
     console.log('Resolviendo captcha Turnstile...');
     const captchaSolution = await solveTurnstileCaptcha(page);
@@ -338,20 +392,20 @@ async function interactWithLoginForm(page: Page, payload: DianTokenEmailPayload)
 
     console.log('Captcha resuelto. Enviando formulario...');
     await page.waitForTimeout(CONFIG.waitTimes.afterCaptcha);
-    const submitButton = page.locator(CONFIG.selectors.submitButton);
+    const submitButton = page.locator(CONFIG.selectors.company.submitButton);
 
     try {
         await submitButton.click({ timeout: 5000 });
     } catch (error) {
-        console.warn('⚠️  Falló el click en submit, reintentando con force...');
+        console.warn('⚠️  Falló el click en submit del formulario de empresa, reintentando con force...');
         await submitButton.click({ force: true });
     }
 }
 
 async function solveTurnstileCaptcha(page: Page): Promise<string | null> {
-    await page.waitForSelector(CONFIG.selectors.captchaContainer, { state: 'visible', timeout: CONFIG.timeouts.captcha });
+    await page.waitForSelector(CONFIG.selectors.common.captchaContainer, { state: 'visible', timeout: CONFIG.timeouts.captcha });
 
-    const siteKey = await page.getAttribute(CONFIG.selectors.captchaContainer, 'data-sitekey');
+    const siteKey = await page.getAttribute(CONFIG.selectors.common.captchaContainer, 'data-sitekey');
 
     if (!siteKey) {
         throw new Error('No se pudo obtener el sitekey del captcha');
@@ -363,7 +417,7 @@ async function solveTurnstileCaptcha(page: Page): Promise<string | null> {
         return null;
     }
 
-    await page.waitForSelector(CONFIG.selectors.captchaResponseInput, { state: 'attached' });
+    await page.waitForSelector(CONFIG.selectors.common.captchaResponseInput, { state: 'attached' });
     await page.evaluate(({ selector, solution }: { selector: string; solution: string }) => {
         const field = document.querySelector<HTMLInputElement>(selector);
         if (field) {
@@ -371,12 +425,12 @@ async function solveTurnstileCaptcha(page: Page): Promise<string | null> {
             field.dispatchEvent(new Event('input', { bubbles: true }));
             field.dispatchEvent(new Event('change', { bubbles: true }));
         }
-    }, { selector: CONFIG.selectors.captchaResponseInput, solution: token });
+    }, { selector: CONFIG.selectors.common.captchaResponseInput, solution: token });
 
     return token;
 }
 
-async function waitForResultMessage(page: Page): Promise<string> {
+async function waitForResultMessage(page: Page, isPersonLogin: boolean): Promise<string> {
     const deadline = Date.now() + CONFIG.timeouts.result;
     let lastModalError: string | null = null;
     let lastBlockedRedirects = 0;
@@ -408,7 +462,7 @@ async function waitForResultMessage(page: Page): Promise<string> {
         }
 
         try {
-            const successElement = await page.$(CONFIG.selectors.successAlert);
+            const successElement = await page.$(CONFIG.selectors.common.successAlert);
             if (successElement) {
                 const message = (await successElement.innerText().catch(() => ''))?.trim();
                 if (message) {
@@ -429,7 +483,7 @@ async function waitForResultMessage(page: Page): Promise<string> {
             if (message.includes('Target page, context or browser has been closed')) {
                 throw new Error(lastModalError ?? 'La página de la DIAN se recargó antes de obtener respuesta. Verifique el estado del portal e intente nuevamente.');
             }
-            console.warn('No fue posible leer los mensajes de error.', error);
+           throw error;
         }
 
         if (modalState?.lastError && !lastModalError) {
@@ -440,29 +494,32 @@ async function waitForResultMessage(page: Page): Promise<string> {
             throw new Error(lastModalError ?? 'La página de la DIAN se cerró antes de obtener respuesta. Verifique los datos e intente nuevamente.');
         }
 
-        try {
-            const selectionButton = await page.$(CONFIG.selectors.legalRepresentativeButton);
-            if (selectionButton) {
-                const returnedToSelection = await selectionButton.evaluate((el: Element) => {
-                    const style = window.getComputedStyle(el as HTMLElement);
-                    return style.display !== 'none' && style.visibility !== 'hidden';
-                }).catch(() => false);
+        // Solo verificar botón de empresa si no es login de persona
+        if (!isPersonLogin) {
+            try {
+                const selectionButton = await page.$(CONFIG.selectors.company.legalRepresentativeButton);
+                if (selectionButton) {
+                    const returnedToSelection = await selectionButton.evaluate((el: Element) => {
+                        const style = window.getComputedStyle(el as HTMLElement);
+                        return style.display !== 'none' && style.visibility !== 'hidden';
+                    }).catch(() => false);
 
-                if (returnedToSelection) {
-                    if (lastModalError) {
-                        throw new Error(lastModalError);
+                    if (returnedToSelection) {
+                        if (lastModalError) {
+                            throw new Error(lastModalError);
+                        }
+
+                        const fallbackModal = await readModalError(page);
+                        if (fallbackModal) {
+                            throw new Error(fallbackModal);
+                        }
+
+                        throw new Error('No fue posible generar el token. Verifique la información e intente nuevamente.');
                     }
-
-                    const fallbackModal = await readModalError(page);
-                    if (fallbackModal) {
-                        throw new Error(fallbackModal);
-                    }
-
-                    throw new Error('No fue posible generar el token. Verifique la información e intente nuevamente.');
                 }
+            } catch (error) {
+                console.warn('No fue posible verificar el estado del formulario inicial.', error);
             }
-        } catch (error) {
-            console.warn('No fue posible verificar el estado del formulario inicial.', error);
         }
 
         await page.waitForTimeout(100);
@@ -473,7 +530,7 @@ async function waitForResultMessage(page: Page): Promise<string> {
 
 async function readModalError(page: Page): Promise<string | null> {
     try {
-        const modalHandle = await page.$(CONFIG.selectors.errorModal);
+        const modalHandle = await page.$(CONFIG.selectors.common.errorModal);
         if (!modalHandle) {
             return null;
         }
@@ -490,12 +547,12 @@ async function readModalError(page: Page): Promise<string | null> {
         }
 
         const title = await page.$eval(
-            CONFIG.selectors.errorModalTitle,
+            CONFIG.selectors.common.errorModalTitle,
             (element) => element.textContent?.trim() ?? ''
         ).catch(() => '');
 
         const message = await page.$eval(
-            CONFIG.selectors.errorModalMessage,
+            CONFIG.selectors.common.errorModalMessage,
             (element) => element.textContent?.trim() ?? ''
         ).catch(() => '');
 
@@ -508,8 +565,9 @@ async function readModalError(page: Page): Promise<string | null> {
 
 async function extractErrorMessage(page: Page): Promise<string | null> {
     const selectorsToCheck = [
-        CONFIG.selectors.errorAlert,
-        CONFIG.selectors.toastMessage
+        CONFIG.selectors.common.errorAlert,
+        CONFIG.selectors.common.toastMessage,
+        CONFIG.selectors.common.fieldValidationError
     ];
 
     for (const selector of selectorsToCheck) {

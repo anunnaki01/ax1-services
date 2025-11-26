@@ -45,7 +45,7 @@ async function main() {
     console.log(JSON.stringify(event, null, 2));
     console.log('\n' + '-'.repeat(80));
 
-    const handlerPath = path.join(__dirname, '../dist/lambdas/generate-dian.token-email.js');
+    const handlerPath = path.join(__dirname, '../dist/lambdas/generate-dian-token-email.js');
 
     if (!fs.existsSync(handlerPath)) {
         console.log('⚠️  Handler no compilado. Ejecutando build...\n');
